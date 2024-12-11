@@ -14,7 +14,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # Configure AWS credentials using GitHub Secrets
+      # Configure AWS credentials
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -23,23 +23,30 @@ jobs:
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: us-east-1
 
-      # Set up Terraform CLI
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v2
+      # Install jq (if missing)
+      - name: Install jq
+        run: sudo apt-get install -y jq
 
-      # Network Directory Terraform Execution
+      # Terraform Init
       - name: Terraform Init in Network Folder
         working-directory: ./Network
         run: terraform init
 
+      # Terraform Plan
       - name: Terraform Plan in Network Folder
         working-directory: ./Network
         run: terraform plan -out=tfplan_network
 
+      # Check for Changes
       - name: Check Network Plan for Changes
-        id: check_network_plan
         working-directory: ./Network
         run: |
+          if [ ! -s ./tfplan_network ]; then
+            echo "Plan file missing or empty. Skipping."
+            echo "skip_network_apply=true" >> $GITHUB_ENV
+            exit 0
+          fi
+
           terraform show -json tfplan_network | jq '.resource_changes | length' > changes.txt
           CHANGES=$(cat changes.txt)
           if [ "$CHANGES" -eq 0 ]; then
@@ -49,6 +56,7 @@ jobs:
             echo "Changes detected in Network. Proceeding with apply."
             echo "skip_network_apply=false" >> $GITHUB_ENV
 
+      # Conditional Apply
       - name: Terraform Apply in Network Folder
         if: env.skip_network_apply == 'false'
         working-directory: ./Network
