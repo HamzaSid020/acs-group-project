@@ -22,8 +22,6 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: us-east-1
-        env:
-          ACTIONS_STEP_DEBUG: true
 
       # Set up Terraform CLI
       - name: Set up Terraform
@@ -36,11 +34,25 @@ jobs:
 
       - name: Terraform Plan in Network Folder
         working-directory: ./Network
-        run: terraform plan
+        run: terraform plan -out=tfplan_network
+
+      - name: Check Network Plan for Changes
+        id: check_network_plan
+        working-directory: ./Network
+        run: |
+          terraform show -json tfplan_network | jq '.resource_changes | length' > changes.txt
+          CHANGES=$(cat changes.txt)
+          if [ "$CHANGES" -eq 0 ]; then
+            echo "No changes detected in Network. Skipping apply."
+            echo "skip_network_apply=true" >> $GITHUB_ENV
+          else
+            echo "Changes detected in Network. Proceeding with apply."
+            echo "skip_network_apply=false" >> $GITHUB_ENV
 
       - name: Terraform Apply in Network Folder
+        if: env.skip_network_apply == 'false'
         working-directory: ./Network
-        run: terraform apply -auto-approve
+        run: terraform apply -auto-approve tfplan_network
 
       # Webserver Directory Terraform Execution
       - name: Terraform Init in Webserver Folder
@@ -49,8 +61,22 @@ jobs:
 
       - name: Terraform Plan in Webserver Folder
         working-directory: ./Webserver
-        run: terraform plan
+        run: terraform plan -out=tfplan_webserver
+
+      - name: Check Webserver Plan for Changes
+        id: check_webserver_plan
+        working-directory: ./Webserver
+        run: |
+          terraform show -json tfplan_webserver | jq '.resource_changes | length' > changes.txt
+          CHANGES=$(cat changes.txt)
+          if [ "$CHANGES" -eq 0 ]; then
+            echo "No changes detected in Webserver. Skipping apply."
+            echo "skip_webserver_apply=true" >> $GITHUB_ENV
+          else
+            echo "Changes detected in Webserver. Proceeding with apply."
+            echo "skip_webserver_apply=false" >> $GITHUB_ENV
 
       - name: Terraform Apply in Webserver Folder
+        if: env.skip_webserver_apply == 'false'
         working-directory: ./Webserver
-        run: terraform apply -auto-approve
+        run: terraform apply -auto-approve tfplan_webserver
