@@ -1,7 +1,7 @@
 data "terraform_remote_state" "networks" {
   backend = "s3"
   config = {
-    bucket = "aws-bucket-dhana1"
+    bucket = "aws-bucket-project"
     key    = "network/terraform.tfstate"
     region = "us-east-1"
   }
