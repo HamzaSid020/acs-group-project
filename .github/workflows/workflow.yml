@@ -14,76 +14,57 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # Configure AWS credentials
+      # Configure AWS Credentials
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: us-east-1
 
-      # Install jq (if missing)
-      - name: Install jq
-        run: sudo apt-get install -y jq
+      # Set up Terraform
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
 
-      # Terraform Init
-      - name: Terraform Init in Network Folder
-        working-directory: ./Network
-        run: terraform init
-
-      # Terraform Plan
-      - name: Terraform Plan in Network Folder
-        working-directory: ./Network
-        run: terraform plan -out=tfplan_network
-
-      # Check for Changes
-      - name: Check Network Plan for Changes
+      # Initialize and Plan for Network
+      - name: Terraform Init and Plan in Network Folder
         working-directory: ./Network
         run: |
-          if [ ! -s ./tfplan_network ]; then
-            echo "Plan file missing or empty. Skipping."
+          terraform init
+          terraform plan -out=tfplan_network || exit_code=$?
+          if [ "$exit_code" -eq 0 ]; then
+            echo "No changes detected in Network."
             echo "skip_network_apply=true" >> $GITHUB_ENV
-            exit 0
-          fi
-
-          terraform show -json tfplan_network | jq '.resource_changes | length' > changes.txt
-          CHANGES=$(cat changes.txt)
-          if [ "$CHANGES" -eq 0 ]; then
-            echo "No changes detected in Network. Skipping apply."
-            echo "skip_network_apply=true" >> $GITHUB_ENV
-          else
-            echo "Changes detected in Network. Proceeding with apply."
+          elif [ "$exit_code" -eq 2 ]; then
+            echo "Changes detected in Network."
             echo "skip_network_apply=false" >> $GITHUB_ENV
+          else
+            echo "Error during Terraform plan in Network."
+            exit $exit_code
 
-      # Conditional Apply
+      # Apply for Network (Conditional)
       - name: Terraform Apply in Network Folder
         if: env.skip_network_apply == 'false'
         working-directory: ./Network
         run: terraform apply -auto-approve tfplan_network
 
-      # Webserver Directory Terraform Execution
-      - name: Terraform Init in Webserver Folder
-        working-directory: ./Webserver
-        run: terraform init
-
-      - name: Terraform Plan in Webserver Folder
-        working-directory: ./Webserver
-        run: terraform plan -out=tfplan_webserver
-
-      - name: Check Webserver Plan for Changes
-        id: check_webserver_plan
+      # Initialize and Plan for Webserver
+      - name: Terraform Init and Plan in Webserver Folder
         working-directory: ./Webserver
         run: |
-          terraform show -json tfplan_webserver | jq '.resource_changes | length' > changes.txt
-          CHANGES=$(cat changes.txt)
-          if [ "$CHANGES" -eq 0 ]; then
-            echo "No changes detected in Webserver. Skipping apply."
+          terraform init
+          terraform plan -out=tfplan_webserver || exit_code=$?
+          if [ "$exit_code" -eq 0 ]; then
+            echo "No changes detected in Webserver."
             echo "skip_webserver_apply=true" >> $GITHUB_ENV
-          else
-            echo "Changes detected in Webserver. Proceeding with apply."
+          elif [ "$exit_code" -eq 2 ]; then
+            echo "Changes detected in Webserver."
             echo "skip_webserver_apply=false" >> $GITHUB_ENV
+          else
+            echo "Error during Terraform plan in Webserver."
+            exit $exit_code
 
+      # Apply for Webserver (Conditional)
       - name: Terraform Apply in Webserver Folder
         if: env.skip_webserver_apply == 'false'
         working-directory: ./Webserver
