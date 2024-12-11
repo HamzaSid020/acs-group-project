@@ -14,7 +14,7 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # Configure AWS Credentials
+      # Configure AWS credentials using GitHub Secrets
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -22,51 +22,35 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: us-east-1
+        env:
+          ACTIONS_STEP_DEBUG: true
 
-      # Set up Terraform
+      # Set up Terraform CLI
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v2
 
-      # Initialize and Plan for Network
-      - name: Terraform Init and Plan in Network Folder
+      # Network Directory Terraform Execution
+      - name: Terraform Init in Network Folder
         working-directory: ./Network
-        run: |
-          terraform init
-          terraform plan -out=tfplan_network || exit_code=$?
-          if [ "$exit_code" -eq 0 ]; then
-            echo "No changes detected in Network."
-            echo "skip_network_apply=true" >> $GITHUB_ENV
-          elif [ "$exit_code" -eq 2 ]; then
-            echo "Changes detected in Network."
-            echo "skip_network_apply=false" >> $GITHUB_ENV
-          else
-            echo "Error during Terraform plan in Network."
-            exit $exit_code
+        run: terraform init
 
-      # Apply for Network (Conditional)
+      - name: Terraform Plan in Network Folder
+        working-directory: ./Network
+        run: terraform plan
+
       - name: Terraform Apply in Network Folder
-        if: env.skip_network_apply == 'false'
         working-directory: ./Network
-        run: terraform apply -auto-approve tfplan_network
+        run: terraform apply -auto-approve
 
-      # Initialize and Plan for Webserver
-      - name: Terraform Init and Plan in Webserver Folder
+      # Webserver Directory Terraform Execution
+      - name: Terraform Init in Webserver Folder
         working-directory: ./Webserver
-        run: |
-          terraform init
-          terraform plan -out=tfplan_webserver || exit_code=$?
-          if [ "$exit_code" -eq 0 ]; then
-            echo "No changes detected in Webserver."
-            echo "skip_webserver_apply=true" >> $GITHUB_ENV
-          elif [ "$exit_code" -eq 2 ]; then
-            echo "Changes detected in Webserver."
-            echo "skip_webserver_apply=false" >> $GITHUB_ENV
-          else
-            echo "Error during Terraform plan in Webserver."
-            exit $exit_code
+        run: terraform init
 
-      # Apply for Webserver (Conditional)
+      - name: Terraform Plan in Webserver Folder
+        working-directory: ./Webserver
+        run: terraform plan
+
       - name: Terraform Apply in Webserver Folder
-        if: env.skip_webserver_apply == 'false'
         working-directory: ./Webserver
-        run: terraform apply -auto-approve tfplan_webserver
+        run: terraform apply -auto-approve
