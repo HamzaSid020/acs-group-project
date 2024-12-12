@@ -1,139 +1,170 @@
 # Two-Tier Web Application Automation with Terraform, Ansible, and GitHub Actions
 
-This assignment focuses on leveraging modern DevOps practices to design and implement a two-tier static web application hosting solution in AWS. The objective is to demonstrate the application of deployment automation, configuration management, and source control tools in creating a secure and scalable infrastructure.  
+## Project Overview
+This project demonstrates the use of modern DevOps practices to design and implement a two-tier static web application hosting solution in AWS. It utilizes Terraform for infrastructure provisioning, Ansible for configuration management, and GitHub Actions for deployment automation. 
 
-Key components include using Terraform to provision the necessary AWS resources and Ansible Playbooks to configure and manage the application environment. The assignment also emphasizes the importance of automating security scans and deployment workflows through GitHub Actions, ensuring a streamlined and efficient delivery process. By integrating these tools and methodologies, the project highlights the best practices in managing infrastructure as code and automating application deployments.
+## Components
+- **Terraform**: Provisions AWS resources including VPCs, subnets, EC2 instances, and a Load Balancer.
+- **Ansible**: Configures web servers and deploys application content.
+- **GitHub Actions**: Automates deployment workflows triggered by commits to the repository.
 
-# Project Overview
+---
 
-The infrastructure consists of the following components:
+## Prerequisites
 
-Terraform: Provisions AWS resources including VPCs, subnets, EC2 instances, and a Load Balancer.
+### Tools
+- **Terraform**: Install the [Terraform CLI](https://www.terraform.io/downloads.html).
+- **AWS CLI**: Install the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
+- **Ansible**: Installed on your local environment or AWS Cloud9.
 
-Ansible: Configures the web servers and deploys application content.
-
-GitHub Actions: Automates Terraform deployment workflows triggered by commits.
-
-# Prerequisites
-
-Tools
-
-Terraform: Install Terraform CLI.
-
-AWS CLI: Install AWS CLI.
-
-Ansible: Installed in your environment (e.g., AWS Cloud9 or local machine).
-
-AWS Setup
-
-Create an S3 Bucket:
-
-Use the AWS Console or CLI to create an S3 bucket for storing Terraform state files.
-
-CLI command:
-
+### AWS Setup
+#### 1. Create an S3 Bucket for Terraform State
+```bash
 aws s3 mb s3://<your-unique-bucket-name>
+```
 
-Update Terraform Configurations:
+#### 2. Update Terraform Backend Configuration
+Update `backend.tf` files in the `Network` and `Webserver` modules with your S3 bucket name and region:
+```hcl
+terraform {
+  backend "s3" {
+    bucket         = "<your-unique-bucket-name>"
+    key            = "terraform/state"
+    region         = "<your-region>"
+  }
+}
+```
 
-Update backend.tf files in the Network and Webserver modules with the S3 bucket name and region.
-
-Set Up Cloud9 Environment (Optional):
-
-Use AWS Cloud9 to run Terraform and Ansible commands.
-
-Install necessary packages in Cloud9:
-
+#### 3. Optional: Set Up AWS Cloud9 Environment
+Install required dependencies:
+```bash
 sudo yum update -y
-
 sudo yum install python3-pip -y
-
 pip install ansible boto3 botocore
+```
 
-# Deployment Steps
+---
 
-## Using Terraform
+## Deployment Steps
 
-1. Network Module
+### Using Terraform
+#### Network Module
+1. Navigate to the Network directory:
+    ```bash
+    cd Network
+    ```
+2. Initialize Terraform:
+    ```bash
+    terraform init
+    ```
+3. Generate and review the execution plan:
+    ```bash
+    terraform plan
+    ```
+4. Apply the Terraform configuration:
+    ```bash
+    terraform apply --auto-approve
+    ```
 
-Navigate to the Network directory:
+#### Webserver Module
+1. Navigate to the Webserver directory:
+    ```bash
+    cd ../Webserver
+    ```
+2. Initialize Terraform:
+    ```bash
+    terraform init -reconfigure
+    ```
+3. Generate and review the execution plan:
+    ```bash
+    terraform plan
+    ```
+4. Apply the Terraform configuration:
+    ```bash
+    terraform apply --auto-approve
+    ```
 
-cd Network
+### Using Ansible
+1. Ensure the private key permissions are correct:
+    ```bash
+    chmod 400 ../Webserver/project_key
+    ```
+2. Run the Ansible playbook:
+    ```bash
+    ansible-playbook playbook_deploy.yaml -i aws_ec2.yaml --private-key ../Webserver/project_key
+    ```
 
-Initialize Terraform:
-
-terraform init
-
-Generate and review the execution plan:
-
-terraform plan
-
-Apply the Terraform configuration:
-
-terraform apply --auto-approve
-
-2. Webserver Module
-
-Navigate to the Webserver directory:
-
-cd ../Webserver
-
-Initialize Terraform:
-
-terraform init -reconfigure
-
-Generate and review the execution plan:
-
-terraform plan
-
-Apply the Terraform configuration:
-
-terraform apply --auto-approve
-
-## Using Ansible
-
-Ensure the private key permissions are correct:
-
-chmod 400 ../Webserver/project_key
-
-Run the Ansible playbook:
-
-ansible-playbook playbook_deploy.yaml -i aws_ec2.yaml --private-key ../Webserver/project_key
+---
 
 ## GitHub Actions Workflow
+A GitHub Actions workflow automates Terraform deployments on commits to the `main` branch.
 
-A GitHub Actions workflow is included to automate Terraform deployments on commits to the main branch. The workflow performs the following:
+### Workflow File
+Create a `.github/workflows/workflow.yml` file with the following content:
 
-Checks out the repository.
+```yaml
+name: Terraform Apply on Commit
 
-Configures AWS credentials using GitHub Secrets.
+on:
+  push:
+    branches:
+      - main
 
-Initializes and applies Terraform configurations in both Network and Webserver directories.
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
 
-Key Workflow File
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
 
-Ensure your GitHub repository contains a .github/workflows/workflow.yml file.
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
 
-Use GitHub Secrets to securely store AWS credentials.
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
 
-# Verification
+      - name: Terraform Init and Apply for Network
+        working-directory: ./Network
+        run: |
+          terraform init
+          terraform apply -auto-approve
 
-Load Balancer
+      - name: Terraform Init and Apply for Webserver
+        working-directory: ./Webserver
+        run: |
+          terraform init
+          terraform apply -auto-approve
+```
 
-After deployment, retrieve the DNS name of the Application Load Balancer from the AWS Console.
+### GitHub Secrets
+Store your AWS credentials securely as GitHub Secrets:
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
 
-Open the DNS name in your browser to verify toggling images and content served by the Nonprod EC2 instances.
+---
 
-# Cleanup
+## Verification
+1. Retrieve the DNS name of the Application Load Balancer from the AWS Console.
+2. Open the DNS name in your browser to verify toggling images and content served by the Nonprod EC2 instances.
 
-To clean up all resources:
+---
 
-Navigate to the Webserver directory and destroy resources:
+## Cleanup
+To destroy all resources:
 
-cd Webserver
-terraform destroy --auto-approve
+1. Navigate to the Webserver directory and destroy resources:
+    ```bash
+    cd Webserver
+    terraform destroy --auto-approve
+    ```
 
-Repeat the process in the Network directory:
-
-cd Network
-terraform destroy --auto-approve
+2. Repeat the process in the Network directory:
+    ```bash
+    cd ../Network
+    terraform destroy --auto-approve
+    
