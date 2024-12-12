@@ -1,5 +1,6 @@
 # Two-Tier Web Application Automation with Terraform, Ansible, and GitHub Actions
 
+
 ## Project Overview
 This project demonstrates the use of modern DevOps practices to design and implement a two-tier static web application hosting solution in AWS. It utilizes Terraform for infrastructure provisioning, Ansible for configuration management, and GitHub Actions for deployment automation. 
 
