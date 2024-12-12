@@ -112,7 +112,7 @@ Initializes and applies Terraform configurations in both Network and Webserver d
 
 Key Workflow File
 
-Ensure your GitHub repository contains a .github/workflows/terraform-deploy.yml file.
+Ensure your GitHub repository contains a .github/workflows/workflow.yml file.
 
 Use GitHub Secrets to securely store AWS credentials.
 
